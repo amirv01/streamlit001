@@ -3,7 +3,7 @@ import pandas as pd
 import math
 
 VAT_RATE = 0.18
-YEARS_OF_COMPARISON = 12
+YEARS_OF_COMPARISON = 15
 TAG_DEPOSIT = "פיקדון"
 TAG_ENTRY_FEE = "דמי כניסה"
 TAG_MONTHLY_ONLY = "תשלום חודשי בלבד"
@@ -71,7 +71,7 @@ def get_offer_input(offer_num, optional_offer):
     if optional_offer:
         Off_Type_Options = [TAG_NO_OFFER, TAG_DEPOSIT, TAG_ENTRY_FEE, TAG_MONTHLY_ONLY]
         First_Off_Type = st.selectbox("סוג הצעה:", Off_Type_Options,
-                                    index=0,
+                                    index=3,
                                     key=("Off_Type_" + str(offer_num)))
         st.session_state.ST_Off_Type[offer_num] = First_Off_Type
 
@@ -131,9 +131,12 @@ def get_offer_input(offer_num, optional_offer):
         First_Off_Monthly_Payment = st.number_input(TAG_MONTHLY_PAYMENT_PROMPMT, min_value=0, step=100,
                                                     format="%0.0i", key ="Off_Monthly_Payment" + str(offer_num)) 
         st.session_state.ST_Off_Monthly_Payment[offer_num] = First_Off_Monthly_Payment
+    
 
+# איתחול אינדיקטור בלחיצה על כפתור "בצע השוואה"    
 def do_calc_indicator():
     st.session_state.Do_Calc_Indicator = True
+
 
 ### Offer calculations functions ###
 def prepare_offer_data(i, effective_VAT_rate):
@@ -190,11 +193,10 @@ def highlight_lowest(row):
     col_a = (deal0_name, 'סך עלות דיור מוגן בערך נוכחי')
     col_b = (deal1_name, 'סך עלות דיור מוגן בערך נוכחי')
     # Compare values
-    if col_a in row.index and col_b in row.index:
-        if row[col_a] < row[col_b]:
-            styles[row.index.get_loc(col_a)] = 'background-color: #d0f0c0'
-        else:
-            styles[row.index.get_loc(col_b)] = 'background-color: #d0f0c0'
+    if row[col_a] < row[col_b]:
+        styles[df.columns.get_loc(col_a)] = 'background-color: #d0f0c0'  # light green
+    else:
+        styles[df.columns.get_loc(col_b)] = 'background-color: #d0f0c0'
     return styles
 
 ### MAIN PROGRAM ###
@@ -210,7 +212,7 @@ Offers_Form()
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    Interest_Rate = st.number_input("ריבית שנתית לחישוב (%):",
+    Interest_Rate = st.number_input("שיעור ריבית שנתית לחישוב (%):",
                                 min_value=1.0, max_value=10.0, value=4.0, step=0.25,
                                 format="%0.2f") / 100
     
@@ -221,148 +223,92 @@ with col2:
     show_details = st.toggle("הצג נתונים מפורטים", value=False, key="show_detailed_data")
 
 if st.session_state.Do_Calc_Indicator == True:
-    
-    # Check if second offer exists
-    second_offer_exists = st.session_state.ST_Off_Type[1] != TAG_NO_OFFER
-
     # ביצוע והדפסה של השוואה
     month_interest = math.pow(1 + Interest_Rate, 1/12) - 1
-        
-    # Calculate first offer
+    
+    # חישוב הצעה ראשונה
     effective_VAT_rate0 = VAT_RATE if st.session_state.ST_Off_VAT_on_Deposit[0] else 0
     drr0 = prepare_offer_data(0, effective_VAT_rate0)
-    off0_results = build_pv_table(
-        st.session_state.ST_Off_Deposit[0],
-        st.session_state.ST_Off_Deposit_Decreas[0],
-        st.session_state.ST_Off_Deposit_Min_Refund[0],
-        st.session_state.ST_Off_Monthly_Payment[0],
-        drr0 * 100,
-        month_interest
-    )
-
-    if second_offer_exists:
-        effective_VAT_rate1 = VAT_RATE if st.session_state.ST_Off_VAT_on_Deposit[1] else 0
-        drr1 = prepare_offer_data(1, effective_VAT_rate1)
-        off1_results = build_pv_table(
-            st.session_state.ST_Off_Deposit[1],
-            st.session_state.ST_Off_Deposit_Decreas[1],
-            st.session_state.ST_Off_Deposit_Min_Refund[1],
-            st.session_state.ST_Off_Monthly_Payment[1],
-            drr1 * 100,
-            month_interest
-        )
+    off0_results = build_pv_table(st.session_state.ST_Off_Deposit[0],
+                   st.session_state.ST_Off_Deposit_Decreas[0],
+                   st.session_state.ST_Off_Deposit_Min_Refund[0],
+                   st.session_state.ST_Off_Monthly_Payment[0],
+                   drr0 *100,
+                   month_interest)
+    
+    # חישוב הצעה שניה
+    effective_VAT_rate1 = VAT_RATE if st.session_state.ST_Off_VAT_on_Deposit[1] else 0
+    drr1 = prepare_offer_data(1, effective_VAT_rate0)
+    off1_results = build_pv_table(st.session_state.ST_Off_Deposit[1],
+                   st.session_state.ST_Off_Deposit_Decreas[1],
+                   st.session_state.ST_Off_Deposit_Min_Refund[1],
+                   st.session_state.ST_Off_Monthly_Payment[1],
+                   drr1 *100,
+                   month_interest)
+    
 
     # Combine rows
     combined_rows = []
-    if second_offer_exists:
-        for a, b in zip(off0_results, off1_results):
-            combined_rows.append([
-                a['Year'],
-                a['Deposit Returned'], a['PV Deposit Returned'], a['PV Rent'], a['PV Total'], a['PV Monthly Avarage'],
-                b['Deposit Returned'], b['PV Deposit Returned'], b['PV Rent'], b['PV Total'], b['PV Monthly Avarage']
-            ])
-    else:
-        for a in off0_results:
-            combined_rows.append([
-                a['Year'],
-                a['Deposit Returned'], a['PV Deposit Returned'], a['PV Rent'], a['PV Total'], a['PV Monthly Avarage']
-            ])
-
-    # Deal names
-    deal0_name = st.session_state.ST_Off_Name[0] or "הצעה ראשונה"
-    deal1_name = st.session_state.ST_Off_Name[1] or "הצעה שניה"
-
-    # Define columns
-    if second_offer_exists:
-        columns = pd.MultiIndex.from_tuples([
-            ('', 'שנה'),
-            (deal0_name, 'פיקדון שיוחזר'),
-            (deal0_name, 'ערך נוכחי של פיקדון שיוחזר'),
-            (deal0_name, 'ערך נוכחי של תשלומים חודשיים'),
-            (deal0_name, 'סך עלות דיור מוגן בערך נוכחי'),
-            (deal0_name, 'ממוצע עלות לחודש בערך נוכחי'),
-            (deal1_name, 'פיקדון שיוחזר'),
-            (deal1_name, 'ערך נוכחי של פיקדון שיוחזר'),
-            (deal1_name, 'ערך נוכחי של תשלומים חודשיים'),
-            (deal1_name, 'סך עלות דיור מוגן בערך נוכחי'),
-            (deal1_name, 'ממוצע עלות לחודש בערך נוכחי'),
+    for a, b in zip(off0_results, off1_results):
+        combined_rows.append([
+            a['Year'],
+            a['Deposit Returned'], a['PV Deposit Returned'], a['PV Rent'], a['PV Total'], a['PV Monthly Avarage'],
+            b['Deposit Returned'], b['PV Deposit Returned'], b['PV Rent'], b['PV Total'], b['PV Monthly Avarage']
         ])
-        columns_limited_details = [
-            ('', 'שנה'),
-            (deal0_name, 'סך עלות דיור מוגן בערך נוכחי'),
-            (deal0_name, 'ממוצע עלות לחודש בערך נוכחי'),
-            (deal1_name, 'סך עלות דיור מוגן בערך נוכחי'),
-            (deal1_name, 'ממוצע עלות לחודש בערך נוכחי'),
-        ]
-    else:
-        columns = pd.MultiIndex.from_tuples([
-            ('', 'שנה'),
-            (deal0_name, 'פיקדון שיוחזר'),
-            (deal0_name, 'ערך נוכחי של פיקדון שיוחזר'),
-            (deal0_name, 'ערך נוכחי של תשלומים חודשיים'),
-            (deal0_name, 'סך עלות דיור מוגן בערך נוכחי'),
-            (deal0_name, 'ממוצע עלות לחודש בערך נוכחי'),
-        ])
-        columns_limited_details = [
-            ('', 'שנה'),
-            (deal0_name, 'סך עלות דיור מוגן בערך נוכחי'),
-            (deal0_name, 'ממוצע עלות לחודש בערך נוכחי'),
-        ]
 
-    # Create DataFrame
+    if not st.session_state.ST_Off_Name[0]:
+        deal0_name = "הצעה ראשונה"
+    else:
+        deal0_name = st.session_state.ST_Off_Name[0]
+
+    if not st.session_state.ST_Off_Name[1]:
+        deal1_name = "הצעה שניה"
+    else:
+        deal1_name = st.session_state.ST_Off_Name[1]
+
+    # Define MultiIndex columns
+    columns = pd.MultiIndex.from_tuples([
+        ('', 'שנה'),
+        (deal0_name, 'פיקדון שיוחזר'),
+        (deal0_name, 'ערך נוכחי של פיקדון שיוחזר'),
+        (deal0_name, 'ערך נוכחי של תשלומים חודשיים'),
+        (deal0_name, 'סך עלות דיור מוגן בערך נוכחי'),
+        (deal0_name, 'ממוצע עלות לחודש בערך נוכחי'),
+        (deal1_name, 'פיקדון שיוחזר'),
+        (deal1_name, 'ערך נוכחי של פיקדון שיוחזר'),
+        (deal1_name, 'ערך נוכחי של תשלומים חודשיים'),
+        (deal1_name, 'סך עלות דיור מוגן בערך נוכחי'),
+        (deal1_name, 'ממוצע עלות לחודש בערך נוכחי'),
+    ])
+
+    columns_limited_details = [
+        ('', 'שנה'),
+        (deal0_name, 'סך עלות דיור מוגן בערך נוכחי'),
+        (deal0_name, 'ממוצע עלות לחודש בערך נוכחי'),
+        (deal1_name, 'סך עלות דיור מוגן בערך נוכחי'),
+        (deal1_name, 'ממוצע עלות לחודש בערך נוכחי'),
+    ]
+
+    # Create and display DataFrame
     df = pd.DataFrame(combined_rows, columns=columns)
 
-    # Display RTL table
+ #   df_formatted = df.applymap(lambda x: f"{x:,}" if isinstance(x, (int, float)) else x)
+ 
+    df_formatted = df.style.apply(highlight_lowest, axis=1).format("{:,}")
+
+    # Display as RTL table
     if show_details:
-        # Full details
-        if second_offer_exists:
-            tab_html = df.style.apply(highlight_lowest, axis=1).format("{:,}").hide(axis="index").to_html()
-        else:
-            tab_html = df.style.format("{:,}").hide(axis="index").to_html()
+        html = df_formatted.to_html(index=False)
     else:
-        # Limited details
-        df_subset = df[columns_limited_details]
-        if second_offer_exists:
-            tab_html = df_subset.style.apply(highlight_lowest, axis=1).format("{:,}").hide(axis="index").to_html()
-        else:
-            tab_html = df_subset.style.format("{:,}").hide(axis="index").to_html()
+        html = df_formatted[columns_limited_details].to_html(index=False)
 
-
-    # rtl_html = f"""
-    # <div dir="rtl" style="text-align: right">
-    # {html}
-    # </div>
-    # """
-
-    rtl_html = f"""<div dir="rtl" style="text-align: right"> {tab_html} </div>"""
-    print(repr(tab_html))
+    rtl_html = f"""
+    <div dir="rtl" style="text-align: right">
+    {html}
+    </div>
+    """
     st.markdown(rtl_html, unsafe_allow_html=True)
 
-rtl_html_explain = f"""
-<div dir="rtl" style="text-align: right">
-המחשבון עוזר להבין את המשמעות ארוכת השנים של הצעות שקיבלתם לדיור מוגן. תוכלו גם להשוות הצעות בין מקומות או להשוות בין אלטרנטיבות שהציעו לכם באותו דיור מוגן (הצעה בשיטת "דמי כניסה" לעומת הצעה ב"פיקדון").
-<BR>
-ריבית - הזינו ריבית שנתית שתשמש לחישובים. כמה? אם אתם עומדים להפקיד בפיקדון בדיור המוגן כסף שיש לכם, כיתבו את הריבית השנתית שאתם חושבים שתוכלו להרוויח אם הכסף יהיה אצלכם כל השנים במקום בפיקדון (נניח 4%). אם אתם לוקחים הלוואה כדי לממן דמי כניסה או פיקדון - אז הריבית השנתית של ההלוואה.
-<BR>
-המחשבון יציג מה תהיה העלות הכלכלית המצטברת אם תתגוררו בדיור המוגן שנה אחת, שנתיים, שלוש שנים וכו'. כל ההשוואות משתמשות בשיטה הכלכלית שנקראת "ערך נוכחי". השיטה נותנת ביטוי לכך שכסף שמשלמים בעתיד, שווה פחות מכסף שמשלמים כיום. לדוגמה אם הריבית היא 4%, אז לשלם היום 100 ש"ח זה כמו לשלם 104 ש"ח בעוד שנה. זה מאפשר לנו להשוות כלכלית, לדוגמה, בין הצעת פיקדון, שמתאפיינת בכך שמפקידים סכום גבוה בכניסה, לבין הצעה בתשלום חודשי בלבד, שמתאפיינת בתשלום חודשי גבוה יותר.
-<BR>
-גם לקבל כסף בעתיד, לדוגמה בהחזר פיקדון, שווה כמובן פחות מלקבל כסף היום. הנה דוגמה איך זה משפיע עלינו כאן: נניח לדוגמה שבכניסה תפקידו 1 מיליון ש"ח דמי פיקדון שישחקו מידי שנה ב- 4%. אם תצאו אחרי 5 שנים, תקבלו אז בחזרה 800 אלף ש"ח. בשיטת "ערך נוכחי", אנחנו מבינים שאם הריבית היא 4%, אז לקבל 800 אלף ₪ בעוד חמש שנים זה כמו לקבל היום רק 657,542 ₪. ולכן העלות הכלכלית של הפיקדון בשהייה במשך חמש שנים בדיור המוגן תהיה בערך נוכחי 342,458 אלף ₪ (מיליון שהפקדתם בכניסה פחות 657,542 ₪).
-<BR>
-דרך אגב, שימו לב שכאשר המחשבון מציג, לדוגמה, ששנתיים של מגורים יעלו בסה"כ 300 אלף ש"ח בערך נוכחי, הכוונה היא שזו העלות בהנחה שאחרי שנתיים יוצאים מהדיור המוגן. כי המחשבון לוקח בחשבון את החזר הפיקדון שיתקבל אחרי שנתיים, והחזר של פיקדון מקבלים כמובן רק אם יוצאים מהדיור המוגן.
-</div>
-"""
 
-with st.expander("הסברים שחשוב לקרוא!"):
-    st.markdown(rtl_html_explain, unsafe_allow_html=True)
-
-
-rtl_html_TOU = f"""
-<div dir="rtl" style="text-align: right">
-אנחנו לא כלכלנים ולא מומחים לדיור מוגן, אז "אין אחריות" על הדיוק. אם זיהיתם טעות, תגידו. ובכלל, אם יש לכם שאלות או פידבק, נשמח מאוד אם תכתבו לנו!
-<BR>
-amirvang@gmail.com
-</div>
-"""
-
-with st.expander("אודות ותנאי שימוש"):
-    st.markdown(rtl_html_TOU, unsafe_allow_html=True)
+    # איתחול אינדיקציה - לא לבצע חישוב מחדש
+    st.session_state.Do_Calc_Indicator = False
