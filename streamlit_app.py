@@ -356,6 +356,7 @@ if st.session_state.Do_Calc_Indicator == True:
     st.markdown(rtl_html, unsafe_allow_html=True)
 
     # Log offer data to Google Sheets
+    st.write("שמור את הנתונים בגוגל שיטס:")
     # Session ID
     if "session_id" not in st.session_state:
         st.session_state.session_id = str(uuid.uuid4())
