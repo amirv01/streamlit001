@@ -1,11 +1,6 @@
 import streamlit as st
 import pandas as pd
 import math
-import gspread
-import uuid, time
-from google.oauth2.service_account import Credentials
-
-
 
 VAT_RATE = 0.18
 YEARS_OF_COMPARISON = 12
@@ -202,24 +197,6 @@ def highlight_lowest(row):
             styles[row.index.get_loc(col_b)] = 'background-color: #d0f0c0'
     return styles
 
-#   Log offer data to Google Sheets
-def log_offer(offer_num):
-    offer_type = st.session_state.ST_Off_Type[offer_num]
-    if offer_type == TAG_NO_OFFER:
-        return
-    row = [
-        st.session_state.session_id,
-        time.strftime("%Y-%m-%d %H:%M:%S"),
-        offer_num,
-        st.session_state.ST_Off_Name[offer_num],
-        offer_type,
-        st.session_state.ST_Off_Deposit[offer_num],
-        st.session_state.ST_Off_Monthly_Payment[offer_num]
-    ]
-    sheet.append_row(row)
-
-
-
 ### MAIN PROGRAM ###
 
 if 'First_Init_Done' not in st.session_state:
@@ -351,22 +328,15 @@ if st.session_state.Do_Calc_Indicator == True:
             tab_html = df_subset.style.format("{:,}").hide(axis="index").to_html()
 
 
+    # rtl_html = f"""
+    # <div dir="rtl" style="text-align: right">
+    # {html}
+    # </div>
+    # """
+
     rtl_html = f"""<div dir="rtl" style="text-align: right"> {tab_html} </div>"""
     print(repr(tab_html))
     st.markdown(rtl_html, unsafe_allow_html=True)
-
-    # Log offer data to Google Sheets
-    # Session ID
-    if "session_id" not in st.session_state:
-        st.session_state.session_id = str(uuid.uuid4())
-    # Google Sheets auth
-    creds = Credentials.from_service_account_info(st.secrets["google"])
-    client = gspread.authorize(creds)
-    sheet = client.open("Streamlit_Offers_Log").sheet1
-    log_offer(0)
-    log_offer(1)
-    st.success("הנתונים נשמרו בהצלחה!")
-
 
 rtl_html_explain = f"""
 <div dir="rtl" style="text-align: right">
