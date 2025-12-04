@@ -384,12 +384,12 @@ if st.session_state.Do_Calc_Indicator == True:
     # Write exactly to A..H on the next row
     start_col_letter = "A"
     end_col_letter = "H"
-    st.session_state.ST_Worksheet.update(f"{start_col_letter}{next_row_idx}:{end_col_letter}{next_row_idx}", log_offer(0))
+    st.session_state.ST_Worksheet.update(f"{start_col_letter}{next_row_idx}:{end_col_letter}{next_row_idx}", [log_offer(0)])
 
     #st.session_state.ST_Worksheet.append_row(log_offer(0))  # Add a new row to the sheet*
     if second_offer_exists:
         next_row_idx += 1
-        st.session_state.ST_Worksheet.update(f"{start_col_letter}{next_row_idx}:{end_col_letter}{next_row_idx}", log_offer(1))
+        st.session_state.ST_Worksheet.update(f"{start_col_letter}{next_row_idx}:{end_col_letter}{next_row_idx}", [log_offer(1)])
     #    st.session_state.ST_Worksheet.append_row(log_offer(1))
 
 
