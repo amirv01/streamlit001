@@ -3,9 +3,7 @@ import pandas as pd
 import math
 import uuid, time
 import gspread
-#from google.oauth2.service_account import Credentials
-
-#from oauth2client.service_account import ServiceAccountCredentials
+from oauth2client.service_account import ServiceAccountCredentials
 #from streamlit_gsheets import GSheetsConnection
 
 
@@ -18,9 +16,6 @@ TAG_ENTRY_FEE = "דמי כניסה"
 TAG_MONTHLY_ONLY = "תשלום חודשי בלבד"
 TAG_NO_OFFER = "ללא הצעה שניה להשוואה"
 TAG_MONTHLY_PAYMENT_PROMPMT = "תשלום חודשי שוטף (דמי שימוש / אחזקה):"
-SPREADSHEET_NAME = 'Streamlit_Offers_Log'
-SHEET_NAME = 'Sheet1'
-
 
 if 'Do_Calc_Indicator' not in st.session_state:
     st.session_state.Do_Calc_Indicator = False
@@ -57,14 +52,8 @@ def initialize_first_run():
     st.session_state.ST_Off_Deposit_Min_Refund = [None, None]
     st.session_state.ST_Off_Monthly_Payment = [None, None]
     st.session_state.ST_Off_Entry_Fee = [None, None]
+
     st.session_state.First_Init_Done = True
-
-    # connect to Google Sheets
-    gc = get_gspread_client()
-    sh = gc.open("Streamlit_Offers_Log") 
-    st.session_state.ST_Worksheet = sh.worksheet("Sheet1")  
-    return
-
 
 ### Form for getting offers' details from user ###
 @st.fragment()
@@ -216,12 +205,18 @@ def highlight_lowest(row):
     return styles
 
 # Authenticate and connect to Google Sheets
-def get_gspread_client():
-    sa_info = dict(st.secrets["gcp_service_account"])
-    pk = sa_info.get("private_key", "")
-    if "\\n" in pk and "-----BEGIN PRIVATE KEY-----" in pk:
-        sa_info["private_key"] = pk.replace("\\n", "\n").strip() + "\n"
-    return gspread.service_account_from_dict(sa_info)
+def connect_to_gsheet(creds_json, spreadsheet_name, sheet_name):
+    scope = ["https://spreadsheets.google.com/feeds", 
+             'https://www.googleapis.com/auth/spreadsheets',
+             "https://www.googleapis.com/auth/drive.file", 
+             "https://www.googleapis.com/auth/drive"]
+    
+    #credentials = ServiceAccountCredentials.from_json_keyfile_name(creds_json, scope)
+    sa_info = st.secrets["gcp_service_account"]
+    credentials = ServiceAccountCredentials.from_service_account_info(sa_info, scope)
+    client = gspread.authorize(credentials)
+    spreadsheet = client.open(spreadsheet_name)  
+    return spreadsheet.worksheet(sheet_name)  # Access specific sheet by name
 
 
 #   Log offer data to Google Sheets
@@ -232,7 +227,6 @@ def log_offer(offer_num):
     row = [
         st.session_state.session_id,
         time.strftime("%Y-%m-%d %H:%M:%S"),
-        st.session_state.Interest_Rate,
         offer_num,
         st.session_state.ST_Off_Name[offer_num],
         offer_type,
@@ -256,7 +250,7 @@ Offers_Form()
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.session_state.Interest_Rate = st.number_input("ריבית שנתית לחישוב (%):",
+    Interest_Rate = st.number_input("ריבית שנתית לחישוב (%):",
                                 min_value=1.0, max_value=10.0, value=4.0, step=0.25,
                                 format="%0.2f") / 100
     
@@ -272,7 +266,7 @@ if st.session_state.Do_Calc_Indicator == True:
     second_offer_exists = st.session_state.ST_Off_Type[1] != TAG_NO_OFFER
 
     # ביצוע והדפסה של השוואה
-    month_interest = math.pow(1 + st.session_state.Interest_Rate, 1/12) - 1
+    month_interest = math.pow(1 + Interest_Rate, 1/12) - 1
         
     # Calculate first offer
     effective_VAT_rate0 = VAT_RATE if st.session_state.ST_Off_VAT_on_Deposit[0] else 0
@@ -379,13 +373,26 @@ if st.session_state.Do_Calc_Indicator == True:
     st.markdown(rtl_html, unsafe_allow_html=True)
 
     # Log offer data to Google Sheets
+    st.write("שמור את הנתונים בגוגל שיטס:")
     # Session ID
     if "session_id" not in st.session_state:
         st.session_state.session_id = str(uuid.uuid4())
     
-    st.session_state.ST_Worksheet.append_row(log_offer(0))  # Add a new row to the sheet*
-    if second_offer_exists:
-        st.session_state.ST_Worksheet.append_row(log_offer(1))
+    # Google Sheet credentials and details
+    SPREADSHEET_NAME = 'Streamlit_Offers_Log'
+    SHEET_NAME = 'Sheet1'
+    CREDENTIALS_FILE = '.streamlit/secrets.toml'
+
+    # Connect to the Google Sheet
+    sheet_by_name = connect_to_gsheet(CREDENTIALS_FILE, SPREADSHEET_NAME, sheet_name=SHEET_NAME)
+
+    # # Google Sheets auth
+    # creds = Credentials.from_service_account_info(st.secrets["google"])
+    # client = gspread.authorize(creds)
+    # sheet = client.open("Streamlit_Offers_Log").sheet1
+    # log_offer(0)
+    # log_offer(1)
+    st.success("הנתונים נשמרו בהצלחה!")
 
 
 rtl_html_explain = f"""
