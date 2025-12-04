@@ -8,9 +8,6 @@ import gspread
 #from oauth2client.service_account import ServiceAccountCredentials
 #from streamlit_gsheets import GSheetsConnection
 
-
-
-
 VAT_RATE = 0.18
 YEARS_OF_COMPARISON = 12
 TAG_DEPOSIT = "פיקדון"
@@ -58,6 +55,8 @@ def initialize_first_run():
     st.session_state.ST_Off_Monthly_Payment = [None, None]
     st.session_state.ST_Off_Entry_Fee = [None, None]
     st.session_state.First_Init_Done = True
+
+    st.session_state.session_id = str(uuid.uuid4())
 
     # connect to Google Sheets
     gc = get_gspread_client()
@@ -379,9 +378,6 @@ if st.session_state.Do_Calc_Indicator == True:
     st.markdown(rtl_html, unsafe_allow_html=True)
 
     # Log offer data to Google Sheets
-    # Session ID
-    if "session_id" not in st.session_state:
-        st.session_state.session_id = str(uuid.uuid4())
     
     st.session_state.ST_Worksheet.append_row(log_offer(0))  # Add a new row to the sheet*
     if second_offer_exists:
