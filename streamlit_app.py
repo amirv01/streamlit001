@@ -379,9 +379,17 @@ if st.session_state.Do_Calc_Indicator == True:
 
     # Log offer data to Google Sheets
     
-    st.session_state.ST_Worksheet.append_row(log_offer(0))  # Add a new row to the sheet*
+    # Compute next empty row index
+    next_row_idx = len(st.session_state.ST_Worksheet.get_all_values()) + 1
+    # Write exactly to A..H on the next row
+    start_col_letter = "A"
+    st.session_state.ST_Worksheet.update(f"{start_col_letter}{next_row_idx}", log_offer(0), value_input_option="USER_ENTERED")
+
+    #st.session_state.ST_Worksheet.append_row(log_offer(0))  # Add a new row to the sheet*
     if second_offer_exists:
-        st.session_state.ST_Worksheet.append_row(log_offer(1))
+        next_row_idx += 1
+        st.session_state.ST_Worksheet.update(f"{start_col_letter}{next_row_idx}", log_offer(1), value_input_option="USER_ENTERED")
+    #    st.session_state.ST_Worksheet.append_row(log_offer(1))
 
 
 rtl_html_explain = f"""
